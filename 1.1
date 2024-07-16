@@ -1,0 +1,75 @@
+registry vechit
+#include <windows.h>
+#include <iostream>
+
+#pragma comment(lib, "advapi32.lib")
+
+void QueryInstalledApps(HKEY hKeyRoot, const wchar_t* subKey) {
+    HKEY hKey;
+    if (RegOpenKeyExW(hKeyRoot, subKey, 0, KEY_READ, &hKey) != ERROR_SUCCESS) {
+        std::wcerr << L"Failed to open registry key: " << subKey << std::endl;
+        return;
+    }
+
+    wchar_t name[256];
+    DWORD nameSize;
+    wchar_t displayName[256];
+    DWORD displayNameSize;
+    wchar_t displayVersion[256];
+    DWORD displayVersionSize;
+    DWORD index = 0;
+
+    while (true) {
+        nameSize = sizeof(name) / sizeof(name[0]);
+        LONG result = RegEnumKeyExW(hKey, index, name, &nameSize, NULL, NULL, NULL, NULL);
+        if (result == ERROR_NO_MORE_ITEMS) {
+            break;
+        } else if (result != ERROR_SUCCESS) {
+            std::wcerr << L"Failed to enumerate registry keys." << std::endl;
+            break;
+        }
+
+        wchar_t subKeyPath[512];
+        swprintf(subKeyPath, sizeof(subKeyPath) / sizeof(wchar_t), L"%s\\%s", subKey, name);
+
+        HKEY hSubKey;
+        if (RegOpenKeyExW(hKeyRoot, subKeyPath, 0, KEY_READ, &hSubKey) == ERROR_SUCCESS) {
+            displayNameSize = sizeof(displayName);
+            displayVersionSize = sizeof(displayVersion);
+
+            if (RegQueryValueExW(hSubKey, L"DisplayName", NULL, NULL, (LPBYTE)displayName, &displayNameSize) == ERROR_SUCCESS &&
+                RegQueryValueExW(hSubKey, L"DisplayVersion", NULL, NULL, (LPBYTE)displayVersion, &displayVersionSize) == ERROR_SUCCESS) {
+                std::wcout << L"Name: " << displayName << L", Version: " << displayVersion << std::endl;
+            }
+
+            RegCloseKey(hSubKey);
+        }
+        ++index;
+    }
+
+    RegCloseKey(hKey);
+}
+
+int main() {
+    std::wcout << L"Installed applications (32-bit):" << std::endl;
+    QueryInstalledApps(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall");
+
+    std::wcout << L"\nInstalled applications (64-bit):" << std::endl;
+    QueryInstalledApps(HKEY_LOCAL_MACHINE, L"SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall");
+
+    return 0;
+}
+
+Explanation
+QueryInstalledApps Function: This function queries the registry for installed applications.
+
+HKEY hKeyRoot: The root registry key (e.g., HKEY_LOCAL_MACHINE).
+const wchar_t* subKey: The subkey to query (e.g., SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall).
+The function opens the registry key and enumerates through its subkeys.
+For each subkey, it retrieves the values for "DisplayName" and "DisplayVersion" and prints them.
+main Function: The main function calls QueryInstalledApps twice, once for 32-bit applications and once for 64-bit applications.
+
+Notes
+Ensure that you have appropriate permissions to read the registry keys.
+You might need to run the program as an administrator to access certain registry keys.
+Compile the program using a C++ compiler that supports WinAPI, such as Microsoft Visual Studio. This version uses basic C++ constructs, making it easier to understand for those who are new to C++.
